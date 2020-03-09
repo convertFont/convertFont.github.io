@@ -34,8 +34,11 @@
             t.classList.add("mdc-list-item");
             t.setAttribute("role", "menuItem");
             t.style = "display: flex; justify-content: space-between;";
-            t.innerHTML = `<input type="file" style="width: 90%;">
-                    <i class="material-icons" onclick="deleteAddBtn(this);">delete</i>`;
+            t.innerHTML = `<li class="mdc-list-item" role="menuitem" style="display: flex; justify-content: space-between;">
+                <i class="material-icons">list</i>
+                <input type="file" style="width: 90%;" accept=".ttf,.otf,.woff,.woff2,.svg,.eot" onchange="inputFile(event);">
+                <i class="material-icons prevent" onclick="deleteAddBtn(this);">delete</i>
+            </li>`;
 
             document.getElementById("preset").appendChild(t);
         }
@@ -109,6 +112,13 @@
             worker.postMessage(urls);
         }
 
+        function inputFile(event) {
+            if (event.srcElement.files.length) {
+                event.srcElement.parentNode.children[0].innerHTML = "playlist_add_check";
+            }else{
+                event.srcElement.parentNode.children[0].innerHTML = "list";
+            }
+        }
     </script>
 </head>
 <body>
@@ -152,12 +162,14 @@
     <div class="mdc-menu mdc-menu-surface mdc-menu-surface--open" style="width: 100%; margin: 10px 0;position: relative;">
         <ul class="mdc-list" role="menu" aria-orientation="vertical" tabindex="-1" id="preset">
             <li class="mdc-list-item" role="menuitem" style="display: flex; justify-content: space-between;">
-                <input type="file" style="width: 90%;" accept=".ttf,.otf,.woff,.woff2,.svg,.eot">
-                <i class="material-icons" onclick="deleteAddBtn(this);">delete</i>
+                <i class="material-icons">list</i>
+                <input type="file" style="width: 90%;" accept=".ttf,.otf,.woff,.woff2,.svg,.eot" onchange="inputFile(event);">
+                <i class="material-icons prevent" onclick="deleteAddBtn(this);">delete</i>
             </li>
             <li class="mdc-list-item" role="menuitem" style="display: flex; justify-content: space-between;">
-                <input type="file" style="width: 90%;">
-                <i class="material-icons" onclick="deleteAddBtn(this);">delete</i>
+                <i class="material-icons">list</i>
+                <input type="file" style="width: 90%;" accept=".ttf,.otf,.woff,.woff2,.svg,.eot" onchange="inputFile(event);">
+                <i class="material-icons prevent" onclick="deleteAddBtn(this);">delete</i>
             </li>
         </ul>
         <hr>
@@ -187,7 +199,8 @@
 
     Sortable.create(document.getElementById('preset'), {
         group: "sorting",
-        sort: true
+        filter: "input,.prevent",
+        preventOnFilter: false
     });
 </script>
 </body>
