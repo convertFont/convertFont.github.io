@@ -34,11 +34,9 @@
             t.classList.add("mdc-list-item");
             t.setAttribute("role", "menuItem");
             t.style = "display: flex; justify-content: space-between;";
-            t.innerHTML = `<li class="mdc-list-item" role="menuitem" style="display: flex; justify-content: space-between;">
-                <i class="material-icons">list</i>
+            t.innerHTML = `<i class="material-icons">list</i>
                 <input type="file" style="width: 90%;" accept=".ttf,.otf,.woff,.woff2,.svg,.eot" onchange="inputFile(event);">
-                <i class="material-icons prevent" onclick="deleteAddBtn(this);">delete</i>
-            </li>`;
+                <i class="material-icons prevent" onclick="deleteAddBtn(this);">delete</i>`;
 
             document.getElementById("preset").appendChild(t);
         }
@@ -58,7 +56,7 @@
 
             for (let i = 0; i < list.children.length; i++) {
                 let child = list.children[i];
-                let input = child.children[0];
+                let input = child.children[1];
                 if (input.type === "file" && input.files.length === 1) {
                     urls.push(input.files[0]);
                 } else {
