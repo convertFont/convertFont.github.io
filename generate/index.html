@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Generate Minecraft BE Glyph PNG</title>
+
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <link href="https://fonts.googleapis.com/css?family=Noto+Sans+KR&display=swap" rel="stylesheet">
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+
+            font-family: "Noto Sans KR Regular", sans-serif;
+        }
+    </style>
+
+    <link href="https://unpkg.com/material-components-web@v4.0.0/dist/material-components-web.min.css" rel="stylesheet">
+    <script src="https://unpkg.com/material-components-web@v4.0.0/dist/material-components-web.min.js"></script>
+
+    <script src="http://cdn.jsdelivr.net/g/filesaver.js"></script>
+
+    <script src="https://raw.githack.com/SortableJS/Sortable/master/Sortable.js"></script>
+
+    <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
+
+    <script>
+        let worker = null;
+
+        function clickAddBtn() {
+            let t = document.createElement("li");
+            t.classList.add("mdc-list-item");
+            t.setAttribute("role", "menuItem");
+            t.style = "display: flex; justify-content: space-between;";
+            t.innerHTML = `<input type="file" style="width: 90%;">
+                    <i class="material-icons" onclick="deleteAddBtn(this);">delete</i>`;
+
+            document.getElementById("preset").appendChild(t);
+        }
+
+        function deleteAddBtn(btn) {
+            btn.parentElement.parentElement.removeChild(btn.parentElement);
+        }
+
+        function gen() {
+            if (worker) {
+                alert("Work already started");
+                return;
+            }
+
+            let list = document.getElementById("preset"), startTime = Date.now();
+            let urls = [];
+
+            for (let i = 0; i < list.children.length; i++) {
+                let child = list.children[i];
+                let input = child.children[0];
+                if (input.type === "file" && input.files.length === 1) {
+                    urls.push(input.files[0]);
+                } else {
+                    list.removeChild(child);
+                    i--;
+                }
+            }
+
+            if (!urls.length) {
+                clickAddBtn();
+                clickAddBtn();
+                alert("upload font file");
+                return;
+            }
+
+            worker = new Worker("/js/fontRegister.js");
+            worker.onmessage = data => {
+                if (typeof data === "string") {
+                    alert(data);
+                } else {
+                    let fontfaces = [];
+                    for (let d of data.data.face) {
+                        fontfaces.push((new FontFace(d[0], d[1]).load()));
+                    }
+
+                    Promise.all(fontfaces).then(res => {
+                        worker.terminate();
+                        worker = null;
+
+                        worker = new Worker("/js/generator.js");
+                        worker.onmessage = data => {
+                            if (!data.data.status) {
+                                document.getElementById("status").innerHTML = data.data.msg;
+                                document.getElementById("res").src = data.data.img;
+                            } else {
+                                document.getElementById("res").src = "";
+                                document.getElementById("status").innerHTML = `Completed! (time: ${Math.round((Date.now() - startTime) / 1000)}s)`;
+
+                                saveAs(data.data.buffer, "fonts.zip");
+                                alert(data.data.msg);
+
+                                worker.terminate();
+                                worker = null;
+                            }
+                        };
+                        worker.postMessage(data.data);
+                    });
+                }
+            };
+
+            worker.postMessage(urls);
+        }
+
+    </script>
+</head>
+<body>
+<header class="mdc-top-app-bar mdc-top-app-bar--short" data-mdc-auto-init="MDCTopAppBar">
+    <div class="mdc-top-app-bar__row">
+        <section class="mdc-top-app-bar__section mdc-top-app-bar__section--align-start">
+            <button class="material-icons mdc-top-app-bar__navigation-icon mdc-icon-button mdc-ripple-upgraded--unbounded mdc-ripple-upgraded" onclick="document.querySelector('.mdc-drawer').MDCDrawer.foundation_.open();" style="--mdc-ripple-fg-size:28px; --mdc-ripple-fg-scale:1.71429; --mdc-ripple-left:10px; --mdc-ripple-top:10px;">menu
+            </button>
+            <span class="mdc-top-app-bar__title">ConvertFont</span>
+        </section>
+    </div>
+</header>
+
+<aside class="mdc-drawer mdc-drawer--modal" data-mdc-auto-init="MDCDrawer" style="z-index: 9999;">
+    <div class="mdc-drawer__header">
+        <h3 class="mdc-drawer__title">ConvertFont</h3>
+        <h6 class="mdc-drawer__subtitle">Generate glyph files from font files.</h6>
+    </div>
+    <div class="mdc-drawer__content">
+        <nav class="mdc-list">
+            <a class="mdc-list-item mdc-list-item--activated" href="/">
+                <i class="material-icons mdc-list-item__graphic" aria-hidden="true">home</i>
+                <span class="mdc-list-item__text">Home</span>
+            </a>
+            <a class="mdc-list-item" href="/generate/" aria-current="page">
+                <i class="material-icons mdc-list-item__graphic" aria-hidden="true">sync</i>
+                <span class="mdc-list-item__text">Generate</span>
+            </a>
+            <a class="mdc-list-item" href="https://github.com/convertFont/convertFont.github.io/" target="_blank">
+                <i class="material-icons mdc-list-item__graphic" aria-hidden="true">code</i>
+                <span class="mdc-list-item__text">Github</span>
+            </a>
+        </nav>
+    </div>
+</aside>
+
+<div class="mdc-drawer-scrim"></div>
+<div style="height: 70px;"></div>
+<div style="text-align: left; width: 90%; margin: 0 auto; z-index: 1">
+    <div>If first font has no glyph for a specific character, that glyph would be taken from the fonts below first font.</div>
+    <div class="mdc-menu mdc-menu-surface mdc-menu-surface--open" style="width: 100%; margin: 10px 0;position: relative;">
+        <ul class="mdc-list" role="menu" aria-orientation="vertical" tabindex="-1" id="preset">
+            <li class="mdc-list-item" role="menuitem" style="display: flex; justify-content: space-between;">
+                <input type="file" style="width: 90%;" accept=".ttf,.otf,.woff,.woff2,.svg,.eot">
+                <i class="material-icons" onclick="deleteAddBtn(this);">delete</i>
+            </li>
+            <li class="mdc-list-item" role="menuitem" style="display: flex; justify-content: space-between;">
+                <input type="file" style="width: 90%;">
+                <i class="material-icons" onclick="deleteAddBtn(this);">delete</i>
+            </li>
+        </ul>
+        <hr>
+        <ul class="mdc-list" role="menu" aria-orientation="vertical" tabindex="-1">
+            <li class="mdc-list-item" role="menuitem" style="display: flex; align-items: center; justify-content: space-between; cursor: pointer;" onclick="clickAddBtn();">
+                Add Font<i class="material-icons">playlist_add</i>
+            </li>
+            <li class="mdc-list-item" role="menuitem" style="display: flex; align-items: center; justify-content: space-between; cursor: pointer;" onclick="gen();">
+                Generate!<i class="material-icons">sync</i>
+            </li>
+        </ul>
+    </div>
+
+    <div id="status"></div>
+    <img id="res" alt="" style="max-width: 512px; width: 100%;">
+</div>
+
+<script>
+    window.mdc.autoInit();
+
+    const listEl = document.querySelector('.mdc-drawer .mdc-list');
+    const drawer = document.querySelector('.mdc-drawer');
+
+    listEl.addEventListener('click', ev => {
+        drawer.open = false;
+    });
+
+    Sortable.create(document.getElementById('preset'), {
+        group: "sorting",
+        sort: true
+    });
+</script>
+</body>
+</html>
