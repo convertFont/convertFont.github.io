@@ -1,4 +1,14 @@
 onmessage = async (data) => {
+    let fontfaces = [];
+    for (let d of data.data.face) {
+        fontfaces.push((new FontFace(d[0], d[1]).load()));
+    }
+    await Promise.all(fontfaces).then(res => {
+        for (let face of res) {
+            self.fonts.add(face);
+        }
+    });
+
     const size = 512;
     const div = size / 16;
 
@@ -25,7 +35,7 @@ onmessage = async (data) => {
     for (let y = 0; y < 16; y++)
         for (let x = 0; x < 16; x++) {
             if (char[num] !== undefined) {
-                dom_ctx.font = ctx.font = (div - 1 + fontSize) + 'px ' + char[num][1];
+                dom_ctx.font = ctx.font = (div - 1 + fontSize) + 'px "' + char[num][1] + '"';
 
                 ctx.fillText(char[num][0], x * div + div / 2 + xOffset, y * div + div / 2 + yOffset, size);
                 //dom_ctx.fillText(char[num][0], x * div + div / 2 + xOffset, y * div + div / 2 + yOffset, size);

@@ -82,77 +82,80 @@
                     alert(data);
                 } else {
                     document.getElementById("status").innerHTML = "Registering font...";
-                    let fontfaces = [];
+                    /*let fontfaces = [];
                     for (let d of data.data.face) {
                         fontfaces.push((new FontFace(d[0], d[1]).load()));
+                    }*/
+                    //Promise.all(fontfaces).then(res => {
+                    worker.terminate();
+                    /*for (let face of res) {
+                        document.fonts.add(face);
+                    }*/
+
+                    let cnt = data.data.cnt, complete = 0, working = 0, worker_limit = document.getElementById("worker-limit").value | 0;
+                    let unicode = data.data.unicode;
+                    let zip = new JSZip(), interval = setInterval(() => document.getElementById("status").innerHTML = `Generating... (count: ${cnt}, ${(Math.round((Date.now() - startTime) / 1000))}s)`, 1000);
+
+                    document.getElementById("status").innerHTML = `Generating... (count: ${cnt})`;
+
+                    let workers = [];
+                    let nextWork = old_worker => {
+                        old_worker.terminate();
+
+                        if (complete >= cnt) {
+                            worker = null;
+
+                            document.getElementById("status").innerHTML = `Complete! (${(Math.round((Date.now() - startTime) / 1000))}s)`
+                            document.getElementById("res").src = "";
+
+                            zip.generateAsync({type: "blob"}).then(content => {
+                                saveAs(content, "result.zip");
+                            });
+                            alert("The download will start soon...");
+                        }
+
+                        if (--working < worker_limit && workers.length) {
+                            let data = workers.shift();
+                            let new_worker = new Worker("/js/glyph.js");
+                            ++working;
+                            setEvent(new_worker);
+                            new_worker.postMessage(data);
+                        }
                     }
-                    Promise.all(fontfaces).then(res => {
-                        worker.terminate();
 
-                        let cnt = data.data.cnt, complete = 0, working = 0, worker_limit = document.getElementById("worker-limit").value | 0;
-                        let unicode = data.data.unicode;
-                        let zip = new JSZip(), interval = setInterval(() => document.getElementById("status").innerHTML = `Generating... (count: ${cnt}, ${(Math.round((Date.now() - startTime) / 1000))}s)`, 1000);
-
-                        document.getElementById("status").innerHTML = `Generating... (count: ${cnt})`;
-
-                        let workers = [];
-                        let nextWork = worker => {
-                            worker.terminate();
-
-                            if (complete >= cnt) {
-                                worker = null;
-
-                                document.getElementById("status").innerHTML = `Complete! (${(Math.round((Date.now() - startTime) / 1000))}s)`
-                                document.getElementById("res").src = "";
-
-                                zip.generateAsync({type: "blob"}).then(content => {
-                                    saveAs(content, "result.zip");
-                                });
-                                alert("The download will start soon...");
+                    let setEvent = worker => {
+                        worker.onmessage = data => {
+                            if (interval) {
+                                clearInterval(interval);
+                                interval = null;
                             }
 
-                            if (--working < worker_limit && workers.length) {
-                                let data = workers.shift();
-                                let new_worker = new Worker("/js/glyph.js");
-                                ++working;
-                                setEvent(new_worker);
-                                new_worker.postMessage(data);
-                            }
+                            document.getElementById("status").innerHTML = data.data.msg + ` (${++complete}/${cnt}, ${(Math.round((Date.now() - startTime) / 1000))}s)`;
+                            document.getElementById("res").src = data.data.dom_img;
+
+                            zip.file(`glyph_${data.data.key}.png`, data.data.img.replace("data:image/png;base64,", ""), {base64: true});
+
+                            nextWork(worker);
+                        };
+                        worker.onerror = e => {
+                            console.log(e);
+                            ++complete;
+                            nextWork(worker);
+                        };
+                    };
+
+                    for (let key in unicode) {
+                        if (working < worker_limit) {
+                            working++;
+                            let glyph_worker = new Worker("/js/glyph.js");
+                            setEvent(glyph_worker);
+                            glyph_worker.postMessage({key: key, char: unicode[key], name: data.data.name, face: data.data.face});
+                        } else {
+                            workers.push({key: key, char: unicode[key], name: data.data.name, face: data.data.face});
                         }
-
-                        let setEvent = worker => {
-                            worker.onmessage = data => {
-                                if (interval) {
-                                    clearInterval(interval);
-                                    interval = null;
-                                }
-
-                                document.getElementById("status").innerHTML = data.data.msg + ` (${++complete}/${cnt}, ${(Math.round((Date.now() - startTime) / 1000))}s)`;
-                                document.getElementById("res").src = data.data.dom_img;
-
-                                zip.file(`glyph_${data.data.key}.png`, data.data.img.replace("data:image/png;base64,", ""), {base64: true});
-
-                                nextWork(worker);
-                            };
-                            worker.onerror = e => {
-                                console.log(e);
-                                ++complete;
-                                nextWork(worker);
-                            };
-                        }
-
-                        for (let key in unicode) {
-                            if (working < worker_limit) {
-                                working++;
-                                let glyph_worker = new Worker("/js/glyph.js");
-                                setEvent(glyph_worker);
-                                glyph_worker.postMessage({key: key, char: unicode[key], name: data.data.name});
-                            } else {
-                                workers.push({key: key, char: unicode[key], name: data.data.name});
-                            }
-                        }
-                        worker.postMessage(data.data);
-                    });
+                    }
+                    worker.postMessage(data.data);
+                    //});
                 }
             };
 

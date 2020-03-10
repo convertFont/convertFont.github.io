@@ -81,7 +81,6 @@ onmessage = async (data) => {
                     }
                 }
             }
-            console.log(unicode)
             postMessage({face: fontface, fonts: fonts, unicode: unicode, cnt: cnt})
         }
     );
