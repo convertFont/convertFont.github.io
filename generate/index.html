@@ -21,6 +21,7 @@
     <script src="https://unpkg.com/material-components-web@v4.0.0/dist/material-components-web.min.js"></script>
 
     <script src="https://cdn.jsdelivr.net/g/filesaver.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.2.2/jszip.min.js"></script>
 
     <script src="https://raw.githack.com/SortableJS/Sortable/master/Sortable.js"></script>
 
@@ -51,6 +52,8 @@
                 return;
             }
 
+            document.getElementById("status").innerHTML = "Validating font...";
+
             let list = document.getElementById("preset"), startTime = Date.now();
             let urls = [];
 
@@ -75,8 +78,10 @@
             worker = new Worker("/js/fontRegister.js");
             worker.onmessage = data => {
                 if (typeof data === "string") {
+                    document.getElementById("status").innerHTML = "";
                     alert(data);
                 } else {
+                    document.getElementById("status").innerHTML = "Registering font...";
                     let fontfaces = [];
                     for (let d of data.data.face) {
                         fontfaces.push((new FontFace(d[0], d[1]).load()));
@@ -86,20 +91,67 @@
                         worker.terminate();
                         worker = null;
 
-                        worker = new Worker("/js/generator.js");
+                        worker = new Worker("/js/charSet.js");
                         worker.onmessage = data => {
-                            if (!data.data.status) {
-                                document.getElementById("status").innerHTML = data.data.msg;
-                                document.getElementById("res").src = data.data.img;
-                            } else {
-                                document.getElementById("res").src = "";
-                                document.getElementById("status").innerHTML = `Completed! (time: ${Math.round((Date.now() - startTime) / 1000)}s)`;
+                            let cnt = data.data.cnt, complete = 0, working = 0, worker_limit = document.getElementById("worker-limit").value | 0;
+                            let unicode = data.data.unicode;
+                            let zip = new JSZip(), interval = setInterval(() => document.getElementById("status").innerHTML = `Generating... (count: ${cnt}, ${(Math.round((Date.now() - startTime) / 1000))}s)`, 1000);
 
-                                saveAs(data.data.buffer, "fonts.zip");
-                                alert(data.data.msg);
+                            document.getElementById("status").innerHTML = `Generating... (count: ${cnt})`;
 
+                            let workers = [];
+                            let nextWork = worker => {
                                 worker.terminate();
-                                worker = null;
+
+                                if (complete >= cnt) {
+                                    document.getElementById("status").innerHTML = `Complete! (${(Math.round((Date.now() - startTime) / 1000))}s)`
+                                    document.getElementById("res").src = "";
+
+                                    zip.generateAsync({type: "blob"}).then(content => {
+                                        saveAs(content, "result.zip");
+                                    });
+                                    alert("The download will start soon...");
+                                }
+
+                                if (--working < worker_limit && workers.length) {
+                                    let data = workers.shift();
+                                    let new_worker = new Worker("/js/glyph.js");
+                                    ++working;
+                                    setEvent(new_worker);
+                                    new_worker.postMessage(data);
+                                }
+                            }
+
+                            let setEvent = worker => {
+                                worker.onmessage = data => {
+                                    if (interval) {
+                                        clearInterval(interval);
+                                        interval = null;
+                                    }
+
+                                    document.getElementById("status").innerHTML = data.data.msg + ` (${++complete}/${cnt}, ${(Math.round((Date.now() - startTime) / 1000))}s)`;
+                                    document.getElementById("res").src = data.data.dom_img;
+
+                                    zip.file(`glyph_${data.data.key}.png`, data.data.img.replace("data:image/png;base64,", ""), {base64: true});
+
+                                    nextWork(worker);
+                                };
+                                worker.onerror = e => {
+                                    console.log(e);
+                                    ++complete;
+                                    nextWork(worker);
+                                };
+                            }
+
+                            for (let key in unicode) {
+                                if (working < worker_limit) {
+                                    working++;
+                                    let glyph_worker = new Worker("/js/glyph.js");
+                                    setEvent(glyph_worker);
+                                    glyph_worker.postMessage({key: key, char: unicode[key], name: data.data.name});
+                                } else {
+                                    workers.push({key: key, char: unicode[key], name: data.data.name});
+                                }
                             }
                         };
                         worker.postMessage(data.data);
@@ -113,7 +165,7 @@
         function inputFile(event) {
             if (event.srcElement.files.length) {
                 event.srcElement.parentNode.children[0].innerHTML = "playlist_add_check";
-            }else{
+            } else {
                 event.srcElement.parentNode.children[0].innerHTML = "list";
             }
         }
@@ -137,11 +189,11 @@
     </div>
     <div class="mdc-drawer__content">
         <nav class="mdc-list">
-            <a class="mdc-list-item mdc-list-item--activated" href="/">
+            <a class="mdc-list-item" href="/">
                 <i class="material-icons mdc-list-item__graphic" aria-hidden="true">home</i>
                 <span class="mdc-list-item__text">Home</span>
             </a>
-            <a class="mdc-list-item" href="/generate/" aria-current="page">
+            <a class="mdc-list-item mdc-list-item--activated" href="/generate/" aria-current="page" aria-selected="true">
                 <i class="material-icons mdc-list-item__graphic" aria-hidden="true">sync</i>
                 <span class="mdc-list-item__text">Generate</span>
             </a>
@@ -179,6 +231,18 @@
                 Generate!<i class="material-icons">sync</i>
             </li>
         </ul>
+    </div>
+
+    <div>
+        <label class="mdc-text-field" data-mdc-auto-init="MDCTextField">
+            <div class="mdc-text-field__ripple"></div>
+            <input class="mdc-text-field__input" type="number" aria-labelledby="worker-label" aria-controls="helper-worker-limit" aria-describedby="helper-worker-limit" value="10" id="worker-limit">
+            <span class="mdc-floating-label" id="worker-label">Worker Count</span>
+            <div class="mdc-line-ripple"></div>
+        </label>
+        <div class="mdc-text-field-helper-line">
+            <div class="mdc-text-field-helper-text" id="helper-worker-limit" aria-hidden="true">The number of workers used to create the png file. As the number of workers increases, problems can arise.</div>
+        </div>
     </div>
 
     <div id="status"></div>
