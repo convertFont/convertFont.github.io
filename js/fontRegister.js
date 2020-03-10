@@ -58,27 +58,31 @@ onmessage = async (data) => {
         }
     }
 
-    let unicode = [];
-    let cnt = 0;
+    Promise.all(p).then(d => {
+            let unicode = [];
+            let cnt = 0;
 
-    for (let font of fonts) {
-        for (let code in font.glyphs.glyphs) {
-            code = parseInt(code);
-            let hex_str = hex(code);
-            let k = hex_str.substr(0, 2), id = parseInt(hex_str.substr(2, 2), 16);
-            //if (k !== "AC") continue;
-            if (k === "E0" || k === "E1") {
-                continue;
+            for (let font of fonts) {
+                for (let glyph of Object.values(font.glyphs.glyphs)) {
+                    let code = glyph.unicode;
+                    code = parseInt(code);
+
+                    let hex_str = hex(code);
+                    let k = hex_str.substr(0, 2), id = parseInt(hex_str.substr(2, 2), 16);
+                    if (k === "E0" || k === "E1") {
+                        continue;
+                    }
+                    if (unicode[k] === undefined) {
+                        unicode[k] = [];
+                        cnt++;
+                    }
+                    if (unicode[k][id] === undefined && font.getPath(String.fromCharCode(code)).commands.length) {
+                        unicode[k][id] = [String.fromCharCode(code), font.names.fullName.en];
+                    }
+                }
             }
-            if (unicode[k] === undefined) {
-                unicode[k] = [];
-                cnt++;
-            }
-            if (unicode[k][id] === undefined && font.getPath(String.fromCharCode(code)).commands.length) {
-                unicode[k][id] = [String.fromCharCode(code), font.names.fullName.en];
-            }
+            console.log(unicode)
+            postMessage({face: fontface, fonts: fonts, unicode: unicode, cnt: cnt})
         }
-    }
-
-    Promise.all(p).then(d => postMessage({face: fontface, fonts: fonts, unicode: unicode, cnt: cnt}));
+    );
 }
