@@ -22,7 +22,6 @@
 
     <script src="https://cdn.jsdelivr.net/g/filesaver.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.2.2/jszip.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/opentype.js@latest/dist/opentype.js"></script>
 
     <script src="https://raw.githack.com/SortableJS/Sortable/master/Sortable.js"></script>
 
@@ -87,7 +86,6 @@
                     for (let d of data.data.face) {
                         fontfaces.push((new FontFace(d[0], d[1]).load()));
                     }
-                    console.log(data.data)
                     Promise.all(fontfaces).then(res => {
                         worker.terminate();
 
